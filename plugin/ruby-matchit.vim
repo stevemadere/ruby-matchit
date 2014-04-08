@@ -19,52 +19,68 @@
 " }}}
 function! s:Ruby_Matchit()
 
+    let block_start_words = 'if\|do\|unless\|elsif\|else\|case\|when\|while\|'
+          \.'until\|def\|module\|class'
     " use default matching for parenthesis, brackets and braces:
     if strpart(getline("."), col(".")-1, 1) =~ '(\|)\|{\|}\|\[\|\]'
-	normal \\\\\
+      normal! %
+      return
     endif
 
-    normal ^
-    sil! let curr_word = expand('<cword>')
-    if curr_word == "" 
+    " use word under cursor if it looks like a block beginning/ending keyword
+    sil! let starting_curr_word = expand('<cword>')
+    if starting_curr_word !~ '\<\(' . block_start_words . '\|end\)\>' 
+      " otherwise, use the word at the beginning of the line
+      " remember where we were in case we abort
+      normal! mZ
+      normal! ^
+      sil! let starting_curr_word = expand('<cword>')
+    endif
+    if starting_curr_word == "" 
 	return 
     endif
     
-    let curr_line = line(".")
     let spaces = strlen(matchstr(getline("."), "^\\s*"))
 
-    if curr_word =~ '\<end\>'
+    if starting_curr_word =~ '\<end\>'
 	while 1
-	    normal k
+	    normal! k
 	    if strlen(matchstr(getline("."), "^\\s*")) == spaces
 			\&& getline(".") !~ "^\\s*$"
 			\&& getline(".") !~ "^#"
-		normal ^
+                " Go to beginning of line unless it is not a block-starting
+                " word in which case we go to the end of line 
+                " (handles cases like:  describe "x" do)
+		normal! ^
+                sil! let ending_curr_word = expand('<cword>')
+                if ending_curr_word !~ '\<\(' . block_start_words . '\)\>'
+                  normal! $
+                endif
 		break
 	    elseif line(".") == 1
-		exe 'normal ' . curr_line . 'G'
+                normal! `Z
 		break
 	    endif
 	endwhile
-    elseif curr_word =~ '\<\(if\|unless\|elsif\|else\|case\|when\|while\|'
-		\.'until\|def\|\|module\|class\)\>'
+    elseif starting_curr_word =~ '\<\(' . block_start_words . '\)\>'
 	while 1
-	    normal j
+	    normal! j
 	    if strlen(matchstr(getline("."), "^\\s*")) == spaces
 			\&& getline(".") !~ "^\\s*$"
 			\&& getline(".") !~ "^#"
-		normal ^
+		normal! ^
 		break
 	    elseif line(".") == line("$")
-		exe 'normal ' . curr_line . 'G'
+                normal! `Z
 		break
 	    endif
 	endwhile
+    else
+      normal! `Z
     endif
 
 endfunction
 
-nnoremap <buffer> \\\\\ %
 nnoremap <buffer> % :call <SID>Ruby_Matchit()<CR>
 
 
